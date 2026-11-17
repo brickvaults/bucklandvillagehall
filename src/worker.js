@@ -23,6 +23,12 @@
  *   SESSION_SECRET   long random string used to sign session cookies
  */
 
+import { json } from "./util.js";
+import {
+  isPhotoPath, servePhoto, listPublicPhotos, listAllPhotos,
+  uploadPhoto, replacePhotoImage, updatePhoto, movePhoto, deletePhoto,
+} from "./photos.js";
+
 const COOKIE = "bh_session";
 const SESSION_HOURS = 8;
 const MAX_FAILED_LOGINS = 8;       // per IP …
@@ -60,6 +66,12 @@ async function publicHost(request, env, url) {
   if (path === "/api/events" && request.method === "GET") {
     return withSecurityHeaders(await listPublicEvents(env));
   }
+  if (path === "/api/photos" && request.method === "GET") {
+    return withSecurityHeaders(await listPublicPhotos(env));
+  }
+  if (isPhotoPath(url.pathname) && (request.method === "GET" || request.method === "HEAD")) {
+    return (await servePhoto(request, env, url)) || notFound(request, env, url);
+  }
   if (path.startsWith("/api/") || ADMIN_ONLY_ASSETS.test(path)) return notFound(request, env, url);
   return env.ASSETS.fetch(request);
 }
@@ -73,6 +85,9 @@ async function adminHost(request, env, url) {
     r.headers.set("Cache-Control", "no-store");
     r.headers.set("X-Robots-Tag", "noindex, nofollow");
     return r;
+  }
+  if (isPhotoPath(url.pathname) && (request.method === "GET" || request.method === "HEAD")) {
+    return (await servePhoto(request, env, url)) || new Response("Not found", { status: 404 });
   }
   if (SHARED_ASSETS.test(url.pathname) || url.pathname === "/favicon.ico") return env.ASSETS.fetch(request);
   if (url.pathname === "/robots.txt") return new Response("User-agent: *\nDisallow: /\n", { headers: { "Content-Type": "text/plain" } });
@@ -112,6 +127,19 @@ async function handleAdminApi(request, env, url, path) {
       if (method === "PUT") return updateEvent(request, env, id);
       if (method === "DELETE") return deleteEvent(env, id);
     }
+
+    if (path === "/api/admin/photos") {
+      if (method === "GET") return listAllPhotos(env);
+      if (method === "POST") return uploadPhoto(request, env);
+    }
+    const p = path.match(/^\/api\/admin\/photos\/(\d+)(\/image|\/move)?$/);
+    if (p) {
+      const id = Number(p[1]);
+      if (!p[2] && method === "PUT") return updatePhoto(request, env, id);
+      if (!p[2] && method === "DELETE") return deletePhoto(env, id);
+      if (p[2] === "/image" && method === "POST") return replacePhotoImage(request, env, id);
+      if (p[2] === "/move" && method === "POST") return movePhoto(request, env, id);
+    }
   }
 
   return json({ error: "Not found" }, 404);
@@ -123,8 +151,8 @@ const ORDER = "ORDER BY day_of_week IS NULL, day_of_week, start_time IS NULL, st
 
 async function listPublicEvents(env) {
   const { results } = await env.DB.prepare(
-    `SELECT id, title, category, day_of_week, frequency, start_time, end_time, venue,
-            description, cost, contact_name, contact_info
+    `SELECT id, title, category, day_of_week, frequency, recurrence, week_of_month, start_time,
+            end_time, venue, description, cost, contact_name, contact_info
        FROM events WHERE is_published = 1 ${ORDER}`
   ).all();
   return json({ events: results }, 200, { "Cache-Control": "public, max-age=60" });
@@ -141,8 +169,9 @@ async function createEvent(request, env) {
   const e = parsed.value;
   const row = await env.DB.prepare(
     `INSERT INTO events (title, category, day_of_week, frequency, start_time, end_time, venue,
-                         description, cost, contact_name, contact_info, is_published)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
+                         description, cost, contact_name, contact_info, is_published,
+                         recurrence, week_of_month)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`
   ).bind(...eventParams(e)).first();
   return json({ event: row }, 201);
 }
@@ -154,7 +183,7 @@ async function updateEvent(request, env, id) {
   const row = await env.DB.prepare(
     `UPDATE events SET title = ?, category = ?, day_of_week = ?, frequency = ?, start_time = ?,
             end_time = ?, venue = ?, description = ?, cost = ?, contact_name = ?, contact_info = ?,
-            is_published = ?, updated_at = datetime('now')
+            is_published = ?, recurrence = ?, week_of_month = ?, updated_at = datetime('now')
       WHERE id = ? RETURNING *`
   ).bind(...eventParams(e), id).first();
   if (!row) return json({ error: "That event no longer exists." }, 404);
@@ -169,7 +198,18 @@ async function deleteEvent(env, id) {
 
 function eventParams(e) {
   return [e.title, e.category, e.day_of_week, e.frequency, e.start_time, e.end_time, e.venue,
-          e.description, e.cost, e.contact_name, e.contact_info, e.is_published];
+          e.description, e.cost, e.contact_name, e.contact_info, e.is_published,
+          e.recurrence, e.week_of_month];
+}
+
+const DAY_NAMES = [null, "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const WEEK_NAMES = [null, "1st", "2nd", "3rd", "4th", "Last"];
+
+/** "Every week", "2nd Thursday of the month" or "Dates vary". */
+function frequencyLabel(day, recurrence, week) {
+  if (day === null) return "Dates vary";
+  if (recurrence === "monthly") return `${WEEK_NAMES[week]} ${DAY_NAMES[day]} of the month`;
+  return "Every week";
 }
 
 /** Validate and normalise an event payload from the admin form. */
@@ -194,6 +234,16 @@ async function readEvent(request) {
   day = day === "" || day === null || day === undefined ? null : Number(day);
   if (day !== null && !(Number.isInteger(day) && day >= 1 && day <= 7)) return { error: "Pick a day of the week." };
 
+  // Weekly, or monthly on the 1st-4th or last (5) of that weekday.
+  const recurrence = day === null ? "weekly" : body.recurrence === "monthly" ? "monthly" : "weekly";
+  let week_of_month = null;
+  if (recurrence === "monthly") {
+    week_of_month = Number(body.week_of_month);
+    if (!(Number.isInteger(week_of_month) && week_of_month >= 1 && week_of_month <= 5)) {
+      return { error: "Pick which week of the month it's on." };
+    }
+  }
+
   const start_time = time(body.start_time);
   const end_time = time(body.end_time);
   if (start_time === undefined || end_time === undefined) return { error: "Times should look like 10:30." };
@@ -204,7 +254,9 @@ async function readEvent(request) {
       title,
       category: str(body.category, 40) || "Community",
       day_of_week: day,
-      frequency: str(body.frequency, 80) || "Every week",
+      frequency: frequencyLabel(day, recurrence, week_of_month),
+      recurrence,
+      week_of_month,
       start_time,
       end_time,
       venue: str(body.venue, 40) || "Main hall",
@@ -300,13 +352,6 @@ function sameOrigin(request, url) {
 }
 
 /* --------------------------------------------------------------- helpers */
-
-function json(data, status = 200, headers = {}) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: { "Content-Type": "application/json; charset=utf-8", ...headers },
-  });
-}
 
 function withSecurityHeaders(res) {
   const r = new Response(res.body, res);

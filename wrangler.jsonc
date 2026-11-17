@@ -26,6 +26,11 @@
     }
   ],
 
+  // Gallery photos uploaded through the admin (Western Europe). Served at /photos/…
+  "r2_buckets": [
+    { "binding": "PHOTOS", "bucket_name": "bucklandvillage-photos" }
+  ],
+
   // The site, www (redirects to the main domain) and the events admin.
   // Cloudflare creates the DNS records for these on deploy.
   "routes": [
@@ -34,5 +39,26 @@
     { "pattern": "admin.bucklandvillage.com", "custom_domain": true }
   ],
 
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+
+  // Local development only (`npm run dev`). With the routes above, `wrangler dev`
+  // rewrites every request to bucklandvillage.com, so localhost and admin.localhost
+  // would look the same. This environment drops the routes; bindings must be
+  // repeated because Wrangler doesn't inherit them into environments.
+  "env": {
+    "local": {
+      "routes": [],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "bucklandvillage-db",
+          "database_id": "ca4e3021-5bef-40c0-9894-684a07460dc0",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "r2_buckets": [
+        { "binding": "PHOTOS", "bucket_name": "bucklandvillage-photos" }
+      ]
+    }
+  }
 }

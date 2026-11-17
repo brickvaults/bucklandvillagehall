@@ -74,6 +74,36 @@
     return DAYS[day];
   }
 
+  // Date of the nth (1-4) or last (5) given weekday (1 = Mon … 7 = Sun) in a month.
+  function nthWeekday(year, month, iso, week) {
+    if (week === 5) {
+      const last = new Date(year, month + 1, 0);
+      return new Date(year, month, last.getDate() - (((last.getDay() || 7) - iso + 7) % 7));
+    }
+    const first = new Date(year, month, 1);
+    return new Date(year, month, 1 + ((iso - (first.getDay() || 7) + 7) % 7) + (week - 1) * 7);
+  }
+
+  // Next time an event happens (today counts until it has finished), or null if dates vary.
+  function nextDate(e) {
+    if (!e.day_of_week) return null;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const finishedToday = (e.end_time || e.start_time || "23:59") < nowHHMM;
+    const notPast = (d) => d > today || (+d === +today && !finishedToday);
+    if (e.recurrence === "monthly" && e.week_of_month) {
+      for (let k = 0; k < 3; k++) {
+        const d = nthWeekday(today.getFullYear(), today.getMonth() + k, e.day_of_week, e.week_of_month);
+        if (notPast(d)) return d;
+      }
+      return null;
+    }
+    let ahead = (e.day_of_week - todayIso + 7) % 7;
+    if (ahead === 0 && finishedToday) ahead = 7;
+    return new Date(today.getFullYear(), today.getMonth(), today.getDate() + ahead);
+  }
+  const daysAhead = (d) => Math.round((d - new Date(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+  const fmtDate = (d) => `${DAYS[d.getDay() || 7]} ${d.getDate()} ${MONTHS[d.getMonth()]}`;
+
   async function loadEvents() {
     const res = await fetch("/api/events", { headers: { Accept: "application/json" } });
     if (!res.ok) throw new Error("Could not load events");
@@ -94,14 +124,11 @@
   if (upcoming) {
     loadEvents()
       .then((events) => {
+        // Everything on in the next 7 days, weekly and monthly alike.
         const dated = events
-          .filter((e) => e.day_of_week)
-          .map((e) => {
-            let ahead = (e.day_of_week - todayIso + 7) % 7;
-            // Already finished today? Then it's next week's.
-            if (ahead === 0 && (e.end_time || e.start_time || "23:59") < nowHHMM) ahead = 7;
-            return { e, ahead };
-          })
+          .map((e) => ({ e, date: nextDate(e) }))
+          .filter((x) => x.date && daysAhead(x.date) <= 7)
+          .map((x) => ({ ...x, ahead: daysAhead(x.date) }))
           .sort((a, b) => a.ahead - b.ahead || (a.e.start_time || "").localeCompare(b.e.start_time || ""))
           .slice(0, 6);
 
@@ -111,8 +138,9 @@
         }
         upcoming.replaceChildren(
           ...dated.map(({ e, ahead }) => {
-            const label = ahead === 7 ? `Next ${DAYS[e.day_of_week]}` : dayLabel(e.day_of_week);
-            const weekly = /^every week$/i.test(e.frequency);
+            const weekly = e.recurrence !== "monthly";
+            const label = !weekly && ahead > 1 ? fmtDate(dated.find((x) => x.e === e).date)
+              : ahead === 7 ? `Next ${DAYS[e.day_of_week]}` : dayLabel(e.day_of_week);
             return el("article", { class: "item" }, [
               el("p", { class: "when" }, [
                 ahead === 0 ? el("span", { class: "today-badge", text: "Today" }) : el("span", { text: label }),
@@ -139,7 +167,7 @@
 
     function eventCard(e) {
       const meta = [e.category && el("li", { class: "cat", text: e.category }), e.venue && el("li", { text: e.venue })];
-      if (e.frequency && !/^every week$/i.test(e.frequency)) meta.push(el("li", { text: e.frequency }));
+      if (e.frequency && e.recurrence === "monthly") meta.push(el("li", { class: "monthly", text: e.frequency }));
       if (e.cost) meta.push(el("li", { text: e.cost }));
 
       const contact = e.contact_name || e.contact_info
@@ -158,6 +186,7 @@
         el("div", {}, [
           el("h3", { text: e.title }),
           el("ul", { class: "event-meta" }, meta),
+          e.recurrence === "monthly" && nextDate(e) ? el("p", { class: "next-date", text: "Next one: " + fmtDate(nextDate(e)) }) : null,
           e.description ? el("p", { text: e.description }) : null,
           contact,
         ]),
@@ -224,10 +253,47 @@
       .catch(() => showError(timetable));
   }
 
-  /* ------------------------------------------------ gallery lightbox */
-  const gallery = document.querySelector(".gallery");
+  /* ------------------------------------------------------- gallery */
+  const albumsEl = document.getElementById("albums");
+  if (albumsEl) {
+    fetch("/api/photos", { headers: { Accept: "application/json" } })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(({ photos }) => {
+        const albums = new Map();
+        for (const p of photos) {
+          if (!albums.has(p.album)) albums.set(p.album, []);
+          albums.get(p.album).push(p);
+        }
+        if (!albums.size) {
+          albumsEl.replaceChildren(el("section", { class: "section" }, [el("div", { class: "wrap" }, [
+            el("div", { class: "empty" }, [el("strong", { text: "No photos yet." }), document.createTextNode("Check back soon.")]),
+          ])]));
+          return;
+        }
+        let i = 0;
+        albumsEl.replaceChildren(...[...albums].map(([name, list]) => {
+          const id = "album-" + i;
+          return el("section", { class: "section" + (i++ % 2 ? " paper" : ""), "aria-labelledby": id }, [
+            el("div", { class: "wrap" }, [
+              el("div", { class: "section-head" }, [el("h2", { id, text: name })]),
+              el("div", { class: "gallery" }, list.map((p) =>
+                el("button", { type: "button", "data-full": p.src, "aria-label": "View larger: " + p.caption }, [
+                  el("img", { src: p.thumb_src, alt: p.caption, width: p.width, height: p.height, loading: "lazy" }),
+                ])
+              )),
+            ]),
+          ]);
+        }));
+      })
+      .catch(() => {
+        albumsEl.replaceChildren(el("section", { class: "section" }, [el("div", { class: "wrap" }, [
+          el("div", { class: "empty" }, [el("strong", { text: "We couldn't load the photos just now." }), document.createTextNode("Please refresh the page.")]),
+        ])]));
+      });
+  }
+
   const box = document.getElementById("lightbox");
-  if (gallery && box && typeof box.showModal === "function") {
+  if (box && typeof box.showModal === "function") {
     const buttons = () => Array.from(document.querySelectorAll(".gallery button"));
     const img = box.querySelector("img");
     const caption = box.querySelector(".caption");
@@ -237,12 +303,12 @@
       const list = buttons();
       index = (i + list.length) % list.length;
       const thumb = list[index].querySelector("img");
-      img.src = thumb.currentSrc || thumb.src;
+      img.src = list[index].dataset.full || thumb.src;
       img.alt = thumb.alt;
       caption.textContent = thumb.alt;
     }
-    gallery.addEventListener("click", (e) => {
-      const b = e.target.closest("button");
+    document.addEventListener("click", (e) => {
+      const b = e.target.closest(".gallery button");
       if (!b) return;
       show(buttons().indexOf(b));
       box.showModal();

@@ -1,11 +1,11 @@
 # Buckland Memorial Hall website (bucklandvillage.com)
 
-A new site for Buckland Memorial Hall. It runs on **Cloudflare Workers** with a **D1** database for the regular events.
+A new site for Buckland Memorial Hall. It runs on **Cloudflare Workers**, with a **D1** database for regular events and gallery details, and **R2** storage for uploaded photos.
 
 | Address | What it is |
 |---|---|
 | `bucklandvillage.com` | Public site: Home, What's On, Hire the hall, Gallery, Contact |
-| `admin.bucklandvillage.com` | Password-protected admin for adding, editing, hiding and deleting regular events |
+| `admin.bucklandvillage.com` | Password-protected admin for regular events and gallery photos |
 
 The admin app and its API only respond on the `admin.` hostname. On the public site those paths return the normal 404 page.
 
@@ -16,14 +16,15 @@ public/            static site (HTML, CSS, JS, images, fonts)
   index.html       Home
   whats-on.html    What's On (events loaded from /api/events)
   hire.html        Hire the hall
-  gallery.html     Gallery (photos from the old site)
+  gallery.html     Gallery (photos loaded from /api/photos)
   contact.html     Contact
   404.html         Not-found page
-  admin.html       Events admin app (served at admin.bucklandvillage.com/)
+  admin.html       Admin app: Events and Gallery tabs (served at admin.bucklandvillage.com/)
   _headers         Security headers (CSP etc.) and image caching
   _redirects       Old WordPress URLs (/about, /blog, /log-in) → new pages
-src/worker.js      API, admin login and the public/admin hostname split
-migrations/        D1 database schema
+src/worker.js      Events API, admin login and the public/admin hostname split
+src/photos.js      Gallery API, photo uploads (R2) and serving /photos/…
+migrations/        D1 database schema (applied automatically on deploy)
 seed/              Made-up sample events for LOCAL testing only
 wrangler.jsonc     Cloudflare config
 ```
@@ -42,6 +43,8 @@ npm run dev
 
 - Public site: http://localhost:8787
 - Admin: http://admin.localhost:8787 (Chrome, Edge and Firefox send `*.localhost` to your machine automatically)
+
+`npm run dev` uses the `local` environment in `wrangler.jsonc`, which leaves out the live domains. Otherwise `wrangler dev` treats every request as bucklandvillage.com and the admin can't be reached locally. Local photos and data are stored in `.wrangler/` and never touch the live site.
 
 ## Deploying
 
@@ -97,12 +100,22 @@ For a second layer of protection, put **Cloudflare Zero Trust → Access** in fr
 
 ## Managing events (for committee members)
 
-- **Add an event:** give the name, day, how often (e.g. "Every week" or "1st Wednesday of the month"), times, room, a short description, cost and the organiser's contact details. Only publish contact details the organiser has agreed to.
+- **Add an event:** give the name, the day, and how often it happens, either **Every week** or **Once a month**. For monthly events, choose which week (1st, 2nd, 3rd, 4th or Last), and the form shows the next date so you can check it. Then add the times, room, a short description, cost and the organiser's contact details. Only publish contact details the organiser has agreed to.
+- Monthly events show "Next one: …" on the What's On page. They only appear in the home page's "Coming up" list in the week they're on.
 - **Hide** takes an event off the website without losing it, for example over the summer break. **Show** puts it back.
 - **Delete** removes it permanently.
 - Events with no fixed day ("Varies") appear under "Other regular events".
 - The home page shows the next six events coming up this week.
 - After 8 wrong passwords, logins from that address are locked for 15 minutes.
+
+## Managing gallery photos (for committee members)
+
+Open the **Gallery** tab in the admin.
+
+- **Upload photos:** pick one or more photos, give each a short description (it's shown with the photo and read aloud by screen readers), and choose an album or create a new one. Photos are resized to a sensible size and their location data is removed in your browser before upload. JPEG, PNG and WebP all work. iPhone HEIC photos work in Safari; in other browsers, export them as JPEG first.
+- **← / →** move a photo earlier or later within its album. Albums appear on the Gallery page in the order of their first photo.
+- **Edit** changes the description or album, or replaces the picture with a different one.
+- **Hide** takes a photo off the website without deleting it. **Delete** removes it permanently.
 
 ## Editing page content
 

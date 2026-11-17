@@ -286,3 +286,5 @@ a.pill.ink:hover { background: #000; border-color: #000; color: #fff; }
 .loading { color: var(--ink-soft); text-align: center; padding: 30px 0; }
 .more-link { margin: 32px 0 0; }
 [hidden] { display: none !important; }
+.event-meta li.monthly { background: var(--yellow); }
+.event .next-date { font-weight: 700; color: var(--ink); margin: 0 0 8px; }

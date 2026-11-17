@@ -36,6 +36,10 @@
           <img src="/img/brand/LOGO-BLACK.png" alt="Buckland Memorial Hall" width="276" height="40">
           <span class="tag">Events admin</span>
         </div>
+        <nav class="admin-tabs" aria-label="Admin sections">
+          <a href="#events" data-tab="events">Events</a>
+          <a href="#gallery" data-tab="gallery">Gallery</a>
+        </nav>
         <div class="pill-row">
           <a id="view-site" class="pill small ghost" href="/" target="_blank" rel="noopener">View What's On</a>
           <button id="logout" class="pill small ghost" type="button">Log out</button>
@@ -43,7 +47,7 @@
       </div>
     </header>
 
-    <main class="wrap admin-main">
+    <main class="wrap admin-main" id="events-view">
       <div class="admin-head">
         <div>
           <h1>Regular events</h1>
@@ -54,10 +58,78 @@
           Add an event
         </button>
       </div>
-      <p id="flash" class="flash" role="status" hidden></p>
       <div id="event-table" aria-live="polite"></div>
     </main>
+
+    <main class="wrap admin-main" id="gallery-view" hidden>
+      <div class="admin-head">
+        <div>
+          <h1>Gallery photos</h1>
+          <p id="photo-summary" class="muted">Loading…</p>
+        </div>
+        <label class="pill" for="photo-files">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          Upload photos
+        </label>
+        <input id="photo-files" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple>
+      </div>
+
+      <section id="upload-panel" class="upload-panel" hidden aria-labelledby="upload-title">
+        <h2 id="upload-title">New photos</h2>
+        <p class="muted">Describe each photo in a few words, e.g. “Children's party in the main hall”. The description is shown with the photo and read aloud to people using screen readers. Photos are resized and location data is removed before upload.</p>
+        <div class="field album-pick">
+          <label for="upload-album">Add to album</label>
+          <select id="upload-album"></select>
+          <input id="upload-album-new" maxlength="60" placeholder="Name of the new album" hidden aria-label="Name of the new album">
+        </div>
+        <ol id="upload-queue" class="upload-queue"></ol>
+        <p id="upload-error" class="form-error" role="alert" hidden></p>
+        <div class="editor-foot">
+          <button type="button" class="pill ghost" id="upload-cancel">Cancel</button>
+          <button type="button" class="pill" id="upload-go">Upload</button>
+        </div>
+      </section>
+
+      <div id="photo-albums" aria-live="polite"></div>
+    </main>
+
+    <p id="flash" class="flash" role="status" hidden></p>
   </div>
+
+  <!-- Edit photo -->
+  <dialog id="photo-editor" class="editor" aria-labelledby="photo-editor-title">
+    <form id="photo-form" method="dialog" novalidate>
+      <div class="editor-head">
+        <h2 id="photo-editor-title">Edit photo</h2>
+        <button type="button" class="icon-btn" data-cancel aria-label="Close">×</button>
+      </div>
+      <img id="photo-preview" class="photo-preview" src="" alt="">
+      <div class="fields">
+        <div class="field span-2">
+          <label for="p-caption">Description <span aria-hidden="true">*</span></label>
+          <input id="p-caption" name="caption" maxlength="200" required>
+        </div>
+        <div class="field span-2 album-pick">
+          <label for="p-album">Album</label>
+          <select id="p-album" name="album"></select>
+          <input id="p-album-new" maxlength="60" placeholder="Name of the new album" hidden aria-label="Name of the new album">
+        </div>
+        <div class="field span-2">
+          <label for="p-replace">Replace with a different photo (optional)</label>
+          <input id="p-replace" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif">
+        </div>
+        <div class="field span-2 check">
+          <input id="p-published" name="is_published" type="checkbox">
+          <label for="p-published">Show this photo on the website</label>
+        </div>
+      </div>
+      <p id="photo-form-error" class="form-error" role="alert" hidden></p>
+      <div class="editor-foot">
+        <button type="button" class="pill ghost" data-cancel>Cancel</button>
+        <button type="submit" class="pill" id="photo-save">Save changes</button>
+      </div>
+    </form>
+  </dialog>
 
   <!-- Add / edit form -->
   <dialog id="editor" class="editor" aria-labelledby="editor-title">
@@ -86,18 +158,24 @@
             <option value="">Varies</option>
           </select>
         </div>
-        <div class="field">
-          <label for="f-frequency">How often</label>
-          <input id="f-frequency" name="frequency" list="frequency-options" maxlength="80" placeholder="Every week">
-          <datalist id="frequency-options">
-            <option value="Every week"></option>
-            <option value="Fortnightly"></option>
-            <option value="Monthly"></option>
-            <option value="1st of the month"></option>
-            <option value="2nd of the month"></option>
-            <option value="Last of the month"></option>
-            <option value="Term time only"></option>
-          </datalist>
+        <div class="field" id="recurrence-field">
+          <label for="f-recurrence">How often</label>
+          <select id="f-recurrence" name="recurrence">
+            <option value="weekly">Every week</option>
+            <option value="monthly">Once a month</option>
+          </select>
+        </div>
+
+        <div class="field span-2" id="week-field" hidden>
+          <label for="f-week">Which week of the month</label>
+          <select id="f-week" name="week_of_month">
+            <option value="1">1st</option>
+            <option value="2">2nd</option>
+            <option value="3">3rd</option>
+            <option value="4">4th</option>
+            <option value="5">Last</option>
+          </select>
+          <p class="hint" id="week-hint" aria-live="polite"></p>
         </div>
 
         <div class="field">
