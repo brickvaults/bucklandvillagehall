@@ -178,7 +178,8 @@ a.pill.ink:hover { background: #000; border-color: #000; color: #fff; }
 /* cards */
 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
 .card { background: var(--paper); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); display: flex; flex-direction: column; }
-.card img { aspect-ratio: 3 / 2; object-fit: cover; width: 100%; }
+/* height: auto stops the <img> height attribute overriding the crop ratio */
+.card img { aspect-ratio: 5 / 4; object-fit: cover; width: 100%; height: auto; }
 .card-body { padding: 22px 24px 26px; }
 .card-body p:last-child { margin-bottom: 0; }
 
@@ -288,3 +289,9 @@ a.pill.ink:hover { background: #000; border-color: #000; color: #fff; }
 [hidden] { display: none !important; }
 .event-meta li.monthly { background: var(--yellow); }
 .event .next-date { font-weight: 700; color: var(--ink); margin: 0 0 8px; }
+
+/* Content photos that open in the lightbox */
+button.zoom { display: block; width: 100%; height: 100%; padding: 0; margin: 0; border: 0; background: none; cursor: zoom-in; overflow: hidden; }
+button.zoom img { transition: transform 0.3s; }
+button.zoom:hover img { transform: scale(1.03); }
+@media (prefers-reduced-motion: reduce) { button.zoom img, .gallery img { transition: none; } }

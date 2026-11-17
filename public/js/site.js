@@ -292,9 +292,34 @@
       });
   }
 
-  const box = document.getElementById("lightbox");
+  /* ------------------------------------------------------ lightbox */
+  // Gallery thumbnails and the content photos on other pages (cards, side photos,
+  // call-to-action photos) open full size in one shared viewer.
+  const ZOOM_SELECTOR = ".gallery button, button.zoom";
+  document.querySelectorAll(".card > img, .rounded-photo > img, .cta-band .photo > img").forEach((im) => {
+    const b = el("button", { type: "button", class: "zoom", "aria-label": "View larger: " + im.alt });
+    im.replaceWith(b);
+    b.append(im);
+  });
+
+  let box = document.getElementById("lightbox");
+  if (!box && document.querySelector(ZOOM_SELECTOR)) {
+    box = el("dialog", { id: "lightbox", class: "lightbox", "aria-label": "Photo viewer" }, [
+      el("img", { src: "", alt: "" }),
+      el("div", { class: "bar" }, [
+        el("p", { class: "caption" }),
+        el("div", { class: "pill-row" }, [
+          el("button", { class: "pill small", type: "button", "data-prev": "", "aria-label": "Previous photo", text: "‹" }),
+          el("button", { class: "pill small", type: "button", "data-next": "", "aria-label": "Next photo", text: "›" }),
+          el("button", { class: "pill small ink", type: "button", "data-close": "", text: "Close" }),
+        ]),
+      ]),
+    ]);
+    document.body.append(box);
+  }
+
   if (box && typeof box.showModal === "function") {
-    const buttons = () => Array.from(document.querySelectorAll(".gallery button"));
+    const buttons = () => Array.from(document.querySelectorAll(ZOOM_SELECTOR));
     const img = box.querySelector("img");
     const caption = box.querySelector(".caption");
     let index = 0;
@@ -303,12 +328,14 @@
       const list = buttons();
       index = (i + list.length) % list.length;
       const thumb = list[index].querySelector("img");
-      img.src = list[index].dataset.full || thumb.src;
+      img.src = list[index].dataset.full || thumb.currentSrc || thumb.src;
       img.alt = thumb.alt;
       caption.textContent = thumb.alt;
+      // Only offer previous/next when there's more than one photo.
+      box.querySelector("[data-prev]").hidden = box.querySelector("[data-next]").hidden = list.length < 2;
     }
     document.addEventListener("click", (e) => {
-      const b = e.target.closest(".gallery button");
+      const b = e.target.closest(ZOOM_SELECTOR);
       if (!b) return;
       show(buttons().indexOf(b));
       box.showModal();
