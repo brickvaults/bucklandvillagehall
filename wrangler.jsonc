@@ -1,0 +1,38 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bucklandvillagehall",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-09-01",
+
+  // Static pages, CSS, JS and images live in ./public.
+  // The Worker runs first on every request so it can split bucklandvillage.com (public)
+  // from admin.bucklandvillage.com (events admin) by hostname.
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "404-page",
+    "run_worker_first": true
+  },
+
+  // Events database (Western Europe). Schema changes go in ./migrations and are
+  // applied automatically by the GitHub Actions deploy.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "bucklandvillage-db",
+      "database_id": "ca4e3021-5bef-40c0-9894-684a07460dc0",
+      "migrations_dir": "migrations"
+    }
+  ],
+
+  // The site, www (redirects to the main domain) and the events admin.
+  // Cloudflare creates the DNS records for these on deploy.
+  "routes": [
+    { "pattern": "bucklandvillage.com", "custom_domain": true },
+    { "pattern": "www.bucklandvillage.com", "custom_domain": true },
+    { "pattern": "admin.bucklandvillage.com", "custom_domain": true }
+  ],
+
+  "observability": { "enabled": true }
+}

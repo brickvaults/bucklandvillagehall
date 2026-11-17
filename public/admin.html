@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Events admin · Buckland Memorial Hall</title>
+  <meta name="theme-color" content="#adc8c1">
+  <link rel="icon" href="/favicon.png" type="image/png">
+  <link rel="stylesheet" href="/css/site.css">
+  <link rel="stylesheet" href="/css/admin.css">
+  <script src="/js/admin.js" defer></script>
+</head>
+<body class="admin">
+
+  <!-- Login -->
+  <main id="login-view" class="login" hidden>
+    <div class="login-card">
+      <img src="/img/brand/LOGO-BLACK.png" alt="Buckland Memorial Hall" width="276" height="40">
+      <h1>Events admin</h1>
+      <p>Log in to add and update the regular events shown on the What's On page.</p>
+      <form id="login-form" novalidate>
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required>
+        <p id="login-error" class="form-error" role="alert" hidden></p>
+        <button class="pill" type="submit">Log in</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- Dashboard -->
+  <div id="app-view" hidden>
+    <header class="admin-bar">
+      <div class="wrap">
+        <div class="brand">
+          <img src="/img/brand/LOGO-BLACK.png" alt="Buckland Memorial Hall" width="276" height="40">
+          <span class="tag">Events admin</span>
+        </div>
+        <div class="pill-row">
+          <a id="view-site" class="pill small ghost" href="/" target="_blank" rel="noopener">View What's On</a>
+          <button id="logout" class="pill small ghost" type="button">Log out</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap admin-main">
+      <div class="admin-head">
+        <div>
+          <h1>Regular events</h1>
+          <p id="summary" class="muted">Loading…</p>
+        </div>
+        <button id="add-event" class="pill" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          Add an event
+        </button>
+      </div>
+      <p id="flash" class="flash" role="status" hidden></p>
+      <div id="event-table" aria-live="polite"></div>
+    </main>
+  </div>
+
+  <!-- Add / edit form -->
+  <dialog id="editor" class="editor" aria-labelledby="editor-title">
+    <form id="event-form" method="dialog" novalidate>
+      <div class="editor-head">
+        <h2 id="editor-title">Add an event</h2>
+        <button type="button" class="icon-btn" data-cancel aria-label="Close">×</button>
+      </div>
+
+      <div class="fields">
+        <div class="field span-2">
+          <label for="f-title">Event name <span aria-hidden="true">*</span></label>
+          <input id="f-title" name="title" maxlength="120" required placeholder="e.g. Yoga for all">
+        </div>
+
+        <div class="field">
+          <label for="f-day">Day</label>
+          <select id="f-day" name="day_of_week">
+            <option value="1">Monday</option>
+            <option value="2">Tuesday</option>
+            <option value="3">Wednesday</option>
+            <option value="4">Thursday</option>
+            <option value="5">Friday</option>
+            <option value="6">Saturday</option>
+            <option value="7">Sunday</option>
+            <option value="">Varies</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-frequency">How often</label>
+          <input id="f-frequency" name="frequency" list="frequency-options" maxlength="80" placeholder="Every week">
+          <datalist id="frequency-options">
+            <option value="Every week"></option>
+            <option value="Fortnightly"></option>
+            <option value="Monthly"></option>
+            <option value="1st of the month"></option>
+            <option value="2nd of the month"></option>
+            <option value="Last of the month"></option>
+            <option value="Term time only"></option>
+          </datalist>
+        </div>
+
+        <div class="field">
+          <label for="f-start">Starts</label>
+          <input id="f-start" name="start_time" type="time">
+        </div>
+        <div class="field">
+          <label for="f-end">Finishes</label>
+          <input id="f-end" name="end_time" type="time">
+        </div>
+
+        <div class="field">
+          <label for="f-venue">Where</label>
+          <select id="f-venue" name="venue">
+            <option>Main hall</option>
+            <option>Small hall</option>
+            <option>Whole hall</option>
+            <option>Garden</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="f-category">Type of event</label>
+          <input id="f-category" name="category" list="category-options" maxlength="40" placeholder="Community">
+          <datalist id="category-options">
+            <option value="Community"></option>
+            <option value="Fitness"></option>
+            <option value="Social"></option>
+            <option value="Children &amp; families"></option>
+            <option value="Clubs"></option>
+            <option value="Arts &amp; crafts"></option>
+            <option value="Music"></option>
+            <option value="Meetings"></option>
+          </datalist>
+        </div>
+
+        <div class="field span-2">
+          <label for="f-description">Description</label>
+          <textarea id="f-description" name="description" rows="4" maxlength="1200" placeholder="A sentence or two about what happens, who it's for and whether to book."></textarea>
+        </div>
+
+        <div class="field">
+          <label for="f-cost">Cost</label>
+          <input id="f-cost" name="cost" maxlength="80" placeholder="e.g. £5 per session, or Free">
+        </div>
+        <div class="field">
+          <label for="f-contact-name">Organiser</label>
+          <input id="f-contact-name" name="contact_name" maxlength="80" placeholder="Name shown on the website">
+        </div>
+        <div class="field span-2">
+          <label for="f-contact-info">Organiser's contact details</label>
+          <input id="f-contact-info" name="contact_info" maxlength="160" placeholder="Phone, email or website. Only add what they're happy to have published">
+        </div>
+
+        <div class="field span-2 check">
+          <input id="f-published" name="is_published" type="checkbox" checked>
+          <label for="f-published">Show this event on the website</label>
+        </div>
+      </div>
+
+      <p id="form-error" class="form-error" role="alert" hidden></p>
+
+      <div class="editor-foot">
+        <button type="button" class="pill ghost" data-cancel>Cancel</button>
+        <button type="submit" class="pill" id="save-btn">Save event</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

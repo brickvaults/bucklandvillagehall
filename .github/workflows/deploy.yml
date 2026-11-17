@@ -1,0 +1,74 @@
+name: Deploy to Cloudflare
+
+# Pull requests: check the Worker builds (no deploy).
+# Push to main:  apply any new D1 migrations, then deploy the site.
+# Also runnable by hand from the Actions tab.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build check (dry run)
+        run: npx wrangler deploy --dry-run --outdir dist
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Skip (with a warning, not a failure) until the one-off setup in README.md is done.
+      - name: Check setup
+        id: setup
+        run: |
+          ready=true
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::warning::Add the CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets to enable deploys (see README.md)."
+            ready=false
+          fi
+          if grep -q 'REPLACE_WITH_YOUR_D1_DATABASE_ID' wrangler.jsonc; then
+            echo "::warning::Put the D1 database_id in wrangler.jsonc to enable deploys (see README.md)."
+            ready=false
+          fi
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        if: steps.setup.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        if: steps.setup.outputs.ready == 'true'
+        run: npm ci
+
+      - name: Apply database migrations
+        if: steps.setup.outputs.ready == 'true'
+        run: npx wrangler d1 migrations apply bucklandvillage-db --remote
+
+      - name: Deploy
+        if: steps.setup.outputs.ready == 'true'
+        run: npx wrangler deploy

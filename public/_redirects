@@ -1,0 +1,9 @@
+# Old WordPress addresses -> new pages
+/about    /#about   301
+/about/   /#about   301
+/blog     /         301
+/blog/    /         301
+/log-in   /         301
+/log-in/  /         301
+/wp-admin /         301
+/wp-login.php /     301

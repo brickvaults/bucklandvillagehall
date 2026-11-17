@@ -1,0 +1,19 @@
+{
+  "name": "bucklandvillagehall",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Buckland Memorial Hall website — static pages + regular events managed from an admin area. Runs on Cloudflare Workers with D1.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "db:migrate:local": "wrangler d1 migrations apply bucklandvillage-db --local",
+    "db:seed:local": "wrangler d1 execute bucklandvillage-db --local --file=./seed/sample-events.sql",
+    "db:migrate:remote": "wrangler d1 migrations apply bucklandvillage-db --remote",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.163.0"
+  },
+  "dependencies": {
+    "@fontsource-variable/plus-jakarta-sans": "^5.3.0"
+  }
+}
