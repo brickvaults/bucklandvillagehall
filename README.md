@@ -57,7 +57,6 @@ Event changes are made in the admin and never need a deploy.
 
 - The D1 database `bucklandvillage-db` exists (Western Europe) with its tables, and its ID is in `wrangler.jsonc`.
 - `wrangler.jsonc` attaches `bucklandvillage.com`, `www.bucklandvillage.com` (which redirects to the main domain) and `admin.bucklandvillage.com`. Cloudflare creates their DNS records on the first deploy.
-- The `CLOUDFLARE_ACCOUNT_ID` repository secret is set.
 
 ### One-off setup
 
@@ -66,9 +65,12 @@ Event changes are made in the admin and never need a deploy.
    - Under *Account Resources*, choose only this account. Under *Zone Resources*, choose only `bucklandvillage.com`.
    - If the first deploy fails with a permissions error while attaching the domains, edit the token and add **Zone → DNS → Edit**.
 
-2. **Give the token to GitHub.** Run this and paste the token when asked:
+2. **Give GitHub the token and account ID.** Run each command and paste the value when asked. The account ID is on the right-hand side of the Cloudflare dashboard's account home page.
    ```bash
    gh secret set CLOUDFLARE_API_TOKEN --repo brickvaults/bucklandvillagehall
+   ```
+   ```bash
+   gh secret set CLOUDFLARE_ACCOUNT_ID --repo brickvaults/bucklandvillagehall
    ```
    Or use GitHub → repo *Settings → Secrets and variables → Actions → New repository secret*.
 
